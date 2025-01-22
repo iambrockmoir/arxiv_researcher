@@ -2,67 +2,70 @@ from http.server import BaseHTTPRequestHandler
 import json
 import sys
 import os
+import logging
+from flask import Flask, request, jsonify, Response
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Add parent directory to path so we can import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from research_assistant import ResearchAssistant
 
-def handle_cors(handler):
-    handler.send_response(200)
-    handler.send_header('Access-Control-Allow-Origin', '*')
-    handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    handler.send_header('Access-Control-Allow-Headers', 'Content-Type')
-    handler.end_headers()
+app = Flask(__name__)
 
-def error_response(handler, status_code, message):
-    handler.send_response(status_code)
-    handler.send_header('Content-Type', 'application/json')
-    handler.send_header('Access-Control-Allow-Origin', '*')
-    handler.end_headers()
-    response = json.dumps({
-        'status': 'error',
-        'message': message
-    })
-    handler.wfile.write(response.encode())
+def handle_cors(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
 
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        handle_cors(self)
+@app.route('/api/search', methods=['POST', 'OPTIONS'])
+def handler():
+    if request.method == 'OPTIONS':
+        logger.info("Handling OPTIONS request")
+        return handle_cors(Response())
+
+    logger.info("Handling POST request")
+    try:
+        data = request.get_json()
+        logger.info(f"Received request data: {data}")
         
-    def do_POST(self):
-        try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body)
-            
-            # Validate input
-            query = data.get('query')
-            if not query:
-                return error_response(self, 400, "Query is required")
-            
-            num_papers = data.get('num_papers', 100)
-            if not isinstance(num_papers, int) or num_papers <= 0:
-                return error_response(self, 400, "num_papers must be a positive integer")
-            
-            # Generate research summary
-            assistant = ResearchAssistant()
-            result = assistant.generate_research_summary(query, num_papers)
-            
-            # Send response
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            
-            response = json.dumps({
-                'status': 'success',
-                'summary': result['summary'],
-                'num_papers': result['num_papers_analyzed'],
-                'query': query
-            })
-            self.wfile.write(response.encode())
-            
-        except json.JSONDecodeError:
-            error_response(self, 400, "Invalid JSON payload")
-        except Exception as e:
-            error_response(self, 500, str(e)) 
+        # Validate input
+        query = data.get('query')
+        if not query:
+            logger.error("Query parameter missing")
+            return jsonify({
+                'status': 'error',
+                'message': 'Query is required'
+            }), 400
+        
+        num_papers = data.get('num_papers', 100)
+        if not isinstance(num_papers, int) or num_papers <= 0:
+            logger.error(f"Invalid num_papers value: {num_papers}")
+            return jsonify({
+                'status': 'error',
+                'message': 'num_papers must be a positive integer'
+            }), 400
+        
+        # Generate research summary
+        logger.info(f"Initializing ResearchAssistant for query: {query}")
+        assistant = ResearchAssistant()
+        result = assistant.generate_research_summary(query, num_papers)
+        
+        response = jsonify({
+            'status': 'success',
+            'summary': result['summary'],
+            'num_papers': result['num_papers_analyzed'],
+            'query': query
+        })
+        logger.info("Successfully generated summary")
+        return handle_cors(response)
+        
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500 
