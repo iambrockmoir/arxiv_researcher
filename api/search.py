@@ -12,9 +12,25 @@ logger = logging.getLogger(__name__)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from research_assistant import ResearchAssistant
 
+def authenticate(headers):
+    """Check if the request has valid API key"""
+    api_key = headers.get('x-api-key')
+    expected_api_key = os.getenv('API_KEY')
+    return api_key == expected_api_key
+
 def handler(request):
     """Vercel serverless function handler"""
     try:
+        # Check authentication
+        if not authenticate(request.headers):
+            return {
+                "statusCode": 401,
+                "body": json.dumps({
+                    "status": "error",
+                    "message": "Invalid or missing API key"
+                })
+            }
+
         # Parse request body
         body = json.loads(request.body)
         logger.info(f"Received request data: {body}")
