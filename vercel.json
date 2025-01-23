@@ -1,5 +1,6 @@
 {
     "version": 2,
+    "public": true,
     "builds": [
         {
             "src": "api/search.py",
@@ -9,7 +10,13 @@
     "routes": [
         {
             "src": "/api/search",
-            "dest": "/api/search.py"
+            "dest": "/api/search.py",
+            "methods": ["POST", "OPTIONS"],
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, x-api-key"
+            }
         }
     ]
 } 
