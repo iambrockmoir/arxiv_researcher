@@ -14,18 +14,14 @@
     "builds": [
         {
             "src": "api/search.py",
-            "use": "@vercel/python",
-            "config": {
-                "runtime": "python3.9",
-                "maxDuration": 300
-            }
+            "use": "@vercel/python"
         }
     ],
     "routes": [
         {
             "src": "/api/search",
-            "methods": ["POST", "OPTIONS"],
-            "dest": "/api/search.py"
+            "dest": "/api/search.py",
+            "methods": ["GET", "POST", "OPTIONS"]
         }
     ]
 } 
